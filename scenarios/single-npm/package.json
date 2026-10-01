@@ -1,0 +1,14 @@
+{
+  "name": "single-npm",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "^22"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": "^11.10.0"
+    }
+  }
+}

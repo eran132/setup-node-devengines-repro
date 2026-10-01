@@ -1,0 +1,64 @@
+name: repro
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repro:
+    name: ${{ matrix.scenario }} / node ${{ matrix.node }} / #${{ matrix.attempt }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [single-npm, monorepo-pnpm-root]
+        node: [22, 24]
+        attempt: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lay out the scenario at the workspace root
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+          NODE_MAJOR: ${{ matrix.node }}
+        run: |
+          cp -a "scenarios/${SCENARIO}/." .
+          cat scenario.env >> "$GITHUB_ENV"
+          . ./scenario.env
+          jq --arg v "^${NODE_MAJOR}" '.engines.node = $v' "$NODE_VERSION_FILE" > tmp.json
+          mv tmp.json "$NODE_VERSION_FILE"
+          echo "--- root package.json"; cat package.json
+          echo "--- $NODE_VERSION_FILE"; cat "$NODE_VERSION_FILE"
+
+      - id: setup
+        continue-on-error: true
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
+          cache: npm
+          cache-dependency-path: ${{ env.CACHE_DEPENDENCY_PATH }}
+
+      - name: Result
+        if: always()
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+          OUTCOME: ${{ steps.setup.outcome }}
+        run: |
+          echo "RESULT ${SCENARIO} / node $(node -v) / npm $(cd /tmp && npm -v) -> setup-node: ${OUTCOME}"
+
+      - name: Proposed fix (npm config get cache --force at the workspace root)
+        if: always()
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+        run: |
+          if out=$(npm config get cache --force 2>/dev/null); then code=0; else code=$?; fi
+          echo "FORCE ${SCENARIO} / node $(node -v) -> exit ${code}, cache=${out}"
