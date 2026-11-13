@@ -17,6 +17,8 @@ and runs setup-node with `cache: npm`.
 | `monorepo-pnpm-root` | `devEngines` pnpm `^10.0.0` | `app/package.json` (plain npm project) | `app/package-lock.json` |
 | `npm12-required` | `devEngines` npm `>=12.2.2` (`onFail: error`) | `package.json` | `package-lock.json` |
 | `plain` | no `devEngines` (regression control) | `package.json` | `package-lock.json` |
+| `runtime-mismatch` | `devEngines` runtime node `>=99` (must keep failing) | `package.json` | `package-lock.json` |
+| `npm12-and-runtime` | `devEngines` npm `>=12.2.2` and runtime node `>=99` (must keep failing) | `package.json` | `package-lock.json` |
 
 ## Workflows
 
@@ -24,8 +26,10 @@ and runs setup-node with `cache: npm`.
   `actions/setup-node@v7.0.0` on Node 22 and 24, including a check of `npm config get cache --force`.
 - [`fix.yml`](.github/workflows/fix.yml): before/after. Every scenario runs on Node 22, 24 and 26 with
   upstream `actions/setup-node@v7.1.0` and with the proposed fix
-  ([eran132/setup-node@fix/npm-cache-devengines](https://github.com/eran132/setup-node/tree/fix/npm-cache-devengines)),
-  10 attempts each. Jobs using the fix have no `continue-on-error`, so the post-job cache save has to
-  pass as well.
+  ([eran132/setup-node@claude/npm-cache-discovery-force-xn8425](https://github.com/eran132/setup-node/tree/claude/npm-cache-discovery-force-xn8425),
+  the follow-up to [actions/setup-node#1663](https://github.com/actions/setup-node/pull/1663)), 10 attempts each.
+  The fix only tolerates a `devEngines.packageManager` mismatch, so the `Result` step asserts that the
+  `runtime-*` scenarios still fail with it, while every other scenario, including the post-job cache
+  save, has to pass.
 
 See the [Actions tab](../../actions) for results.

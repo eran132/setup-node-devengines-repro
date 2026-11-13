@@ -19,7 +19,9 @@ jobs:
       fail-fast: false
       matrix:
         action: [upstream-v7.1.0, fix]
-        scenario: [single-npm, monorepo-pnpm-root, npm12-required, plain]
+        # runtime-mismatch and npm12-and-runtime declare a devEngines.runtime that no Node satisfies;
+        # they must keep failing with the fix as well (see EXPECTED below).
+        scenario: [single-npm, monorepo-pnpm-root, npm12-required, plain, runtime-mismatch, npm12-and-runtime]
         node: [22, 24, 26]
         attempt: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
@@ -47,10 +49,12 @@ jobs:
           cache: npm
           cache-dependency-path: ${{ env.CACHE_DEPENDENCY_PATH }}
 
-      # No continue-on-error: the job, including the post-job cache save, must pass.
+      # continue-on-error only where npm must still reject the project: everywhere else the job,
+      # including the post-job cache save, must pass.
       - id: fix
         if: matrix.action == 'fix'
-        uses: eran132/setup-node@0e0d34e929f86adece92011bfe67675c91abcd90 # fix/npm-cache-devengines
+        continue-on-error: ${{ contains(matrix.scenario, 'runtime') }}
+        uses: eran132/setup-node@10b4c2e8e957edeed559610107752ca340ac2439 # claude/npm-cache-discovery-force-xn8425
         with:
           node-version-file: ${{ env.NODE_VERSION_FILE }}
           cache: npm
@@ -62,5 +66,12 @@ jobs:
           ACTION: ${{ matrix.action }}
           SCENARIO: ${{ matrix.scenario }}
           OUTCOME: ${{ steps.upstream.outcome }}${{ steps.fix.outcome }}
+          # The fix must keep failing when a devEngines engine other than packageManager is unsatisfied.
+          EXPECTED: ${{ (matrix.action == 'fix' && contains(matrix.scenario, 'runtime')) && 'failure' || 'success' }}
         run: |
-          echo "RESULT ${ACTION} / ${SCENARIO} / node $(node -v | cut -d. -f1) -> setup-node: ${OUTCOME/skipped/}"
+          OUTCOME="${OUTCOME/skipped/}"
+          echo "RESULT ${ACTION} / ${SCENARIO} / node $(node -v | cut -d. -f1) -> setup-node: ${OUTCOME}"
+          if [ "${ACTION}" = fix ] && [ "${OUTCOME}" != "${EXPECTED}" ]; then
+            echo "::error::expected setup-node to end with '${EXPECTED}' but it ended with '${OUTCOME}'"
+            exit 1
+          fi
