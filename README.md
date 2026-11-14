@@ -8,8 +8,9 @@ package manager.
 
 ## Scenarios
 
-Each workflow copies one scenario to the workspace root, sets `engines.node` to the matrix Node major,
-and runs setup-node with `cache: npm`.
+Each workflow copies one scenario to the workspace root, sets the matrix Node major in the
+`node-version-file` (`engines.node` in a `package.json`, or the content of `.node-version`), and runs
+setup-node with `cache: npm`.
 
 | Scenario | Root `package.json` | `node-version-file` | `cache-dependency-path` |
 |---|---|---|---|
@@ -17,8 +18,8 @@ and runs setup-node with `cache: npm`.
 | `monorepo-pnpm-root` | `devEngines` pnpm `^10.0.0` | `app/package.json` (plain npm project) | `app/package-lock.json` |
 | `npm12-required` | `devEngines` npm `>=12.2.2` (`onFail: error`) | `package.json` | `package-lock.json` |
 | `plain` | no `devEngines` (regression control) | `package.json` | `package-lock.json` |
-| `runtime-mismatch` | `devEngines` runtime node `>=99` (must keep failing) | `package.json` | `package-lock.json` |
-| `npm12-and-runtime` | `devEngines` npm `>=12.2.2` and runtime node `>=99` (must keep failing) | `package.json` | `package-lock.json` |
+| `runtime-mismatch` | `devEngines` runtime node `^20` (must keep failing) | `.node-version` | `package-lock.json` |
+| `npm12-and-runtime` | `devEngines` npm `>=12.2.2` and runtime node `^20` (must keep failing) | `.node-version` | `package-lock.json` |
 
 ## Workflows
 

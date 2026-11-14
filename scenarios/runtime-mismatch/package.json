@@ -8,7 +8,8 @@
   "devEngines": {
     "runtime": {
       "name": "node",
-      "version": ">=99"
+      "version": "^20",
+      "onFail": "error"
     }
   }
 }

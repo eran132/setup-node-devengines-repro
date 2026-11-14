@@ -90,8 +90,9 @@ jobs:
           cp -a "scenarios/${SCENARIO}/." .
           cat scenario.env >> "$GITHUB_ENV"
           . ./scenario.env
-          jq --arg v "^${NODE_MAJOR}" '.engines.node = $v' "$NODE_VERSION_FILE" > tmp.json
-          mv tmp.json "$NODE_VERSION_FILE"
+          # setup-node would read devEngines.runtime from package.json as the version to install,
+          # so these scenarios pin Node through .node-version and let npm see the runtime mismatch.
+          echo "${NODE_MAJOR}" > "$NODE_VERSION_FILE"
 
       - id: fix
         continue-on-error: true
