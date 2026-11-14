@@ -28,8 +28,9 @@ and runs setup-node with `cache: npm`.
   upstream `actions/setup-node@v7.1.0` and with the proposed fix
   ([eran132/setup-node@claude/npm-cache-discovery-force-xn8425](https://github.com/eran132/setup-node/tree/claude/npm-cache-discovery-force-xn8425),
   the follow-up to [actions/setup-node#1663](https://github.com/actions/setup-node/pull/1663)), 10 attempts each.
-  The fix only tolerates a `devEngines.packageManager` mismatch, so the `Result` step asserts that the
-  `runtime-*` scenarios still fail with it, while every other scenario, including the post-job cache
-  save, has to pass.
+  Jobs using the fix have no `continue-on-error`, so the post-job cache save has to pass as well.
+  The fix only tolerates a `devEngines.packageManager` mismatch, so a second job, `must-reject`,
+  runs the `runtime-mismatch` and `npm12-and-runtime` scenarios with the fix and fails unless
+  setup-node still rejects them.
 
 See the [Actions tab](../../actions) for results.

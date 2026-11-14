@@ -19,9 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         action: [upstream-v7.1.0, fix]
-        # runtime-mismatch and npm12-and-runtime declare a devEngines.runtime that no Node satisfies;
-        # they must keep failing with the fix as well (see EXPECTED below).
-        scenario: [single-npm, monorepo-pnpm-root, npm12-required, plain, runtime-mismatch, npm12-and-runtime]
+        scenario: [single-npm, monorepo-pnpm-root, npm12-required, plain]
         node: [22, 24, 26]
         attempt: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
@@ -49,11 +47,9 @@ jobs:
           cache: npm
           cache-dependency-path: ${{ env.CACHE_DEPENDENCY_PATH }}
 
-      # continue-on-error only where npm must still reject the project: everywhere else the job,
-      # including the post-job cache save, must pass.
+      # No continue-on-error: the job, including the post-job cache save, must pass.
       - id: fix
         if: matrix.action == 'fix'
-        continue-on-error: ${{ contains(matrix.scenario, 'runtime') }}
         uses: eran132/setup-node@10b4c2e8e957edeed559610107752ca340ac2439 # claude/npm-cache-discovery-force-xn8425
         with:
           node-version-file: ${{ env.NODE_VERSION_FILE }}
@@ -66,12 +62,52 @@ jobs:
           ACTION: ${{ matrix.action }}
           SCENARIO: ${{ matrix.scenario }}
           OUTCOME: ${{ steps.upstream.outcome }}${{ steps.fix.outcome }}
-          # The fix must keep failing when a devEngines engine other than packageManager is unsatisfied.
-          EXPECTED: ${{ (matrix.action == 'fix' && contains(matrix.scenario, 'runtime')) && 'failure' || 'success' }}
         run: |
-          OUTCOME="${OUTCOME/skipped/}"
-          echo "RESULT ${ACTION} / ${SCENARIO} / node $(node -v | cut -d. -f1) -> setup-node: ${OUTCOME}"
-          if [ "${ACTION}" = fix ] && [ "${OUTCOME}" != "${EXPECTED}" ]; then
-            echo "::error::expected setup-node to end with '${EXPECTED}' but it ended with '${OUTCOME}'"
+          echo "RESULT ${ACTION} / ${SCENARIO} / node $(node -v | cut -d. -f1) -> setup-node: ${OUTCOME/skipped/}"
+
+  # The fix only tolerates a devEngines.packageManager mismatch. These scenarios declare a
+  # devEngines.runtime that no Node satisfies, so setup-node must keep failing with npm's error.
+  # Separate job: adding them to the matrix above would exceed GitHub's 256-job matrix limit.
+  must-reject:
+    name: "fix must reject / ${{ matrix.scenario }} / node ${{ matrix.node }} / attempt ${{ matrix.attempt }}"
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [runtime-mismatch, npm12-and-runtime]
+        node: [22, 24, 26]
+        attempt: [1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lay out the scenario at the workspace root
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+          NODE_MAJOR: ${{ matrix.node }}
+        run: |
+          cp -a "scenarios/${SCENARIO}/." .
+          cat scenario.env >> "$GITHUB_ENV"
+          . ./scenario.env
+          jq --arg v "^${NODE_MAJOR}" '.engines.node = $v' "$NODE_VERSION_FILE" > tmp.json
+          mv tmp.json "$NODE_VERSION_FILE"
+
+      - id: fix
+        continue-on-error: true
+        uses: eran132/setup-node@10b4c2e8e957edeed559610107752ca340ac2439 # claude/npm-cache-discovery-force-xn8425
+        with:
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
+          cache: npm
+          cache-dependency-path: ${{ env.CACHE_DEPENDENCY_PATH }}
+
+      - name: Result
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+          OUTCOME: ${{ steps.fix.outcome }}
+        run: |
+          echo "RESULT fix / ${SCENARIO} / node $(node -v | cut -d. -f1) -> setup-node: ${OUTCOME} (expected: failure)"
+          if [ "${OUTCOME}" != failure ]; then
+            echo "::error::setup-node must reject an unsatisfied devEngines.runtime, but it ended with '${OUTCOME}'"
             exit 1
           fi
